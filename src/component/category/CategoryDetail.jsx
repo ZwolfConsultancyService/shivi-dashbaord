@@ -53,7 +53,7 @@ export default function CategoryDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600"></div>
           <p className="mt-4 text-gray-600 text-lg">Loading category...</p>
@@ -79,7 +79,7 @@ export default function CategoryDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div className="min-h-screen  py-8">
       <div className="max-w-7xl mx-auto px-4">
         <button
           onClick={() => navigate('/places/categories')}
@@ -115,7 +115,7 @@ export default function CategoryDetail() {
           </h2>
           <button
             onClick={() => navigate('/places/add-place', { state: { categoryId: category._id, categoryName: category.name } })}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2 cursor-pointer"
           >
             <Plus size={20} />
             Add Place
@@ -139,7 +139,7 @@ export default function CategoryDetail() {
             {category.places?.map((place) => (
               <div 
                 key={place._id} 
-                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
 	onClick={() => navigate(`/places/place/${place._id}`)}
 
 

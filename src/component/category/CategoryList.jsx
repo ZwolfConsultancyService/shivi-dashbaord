@@ -50,7 +50,7 @@ export default function CategoryList() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 flex items-center gap-3">
@@ -59,7 +59,7 @@ export default function CategoryList() {
           </h1>
           <button
             onClick={() => navigate('/places/create-category')}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2"
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition flex items-center gap-2 cursor-pointer"
           >
             <Plus size={20} />
             Create Category
@@ -115,14 +115,14 @@ export default function CategoryList() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => navigate(`/places/category/${category._id}`)}
-                      className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 font-medium"
+                      className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 font-medium cursor-pointer"
                     >
                       <Eye size={18} />
                       View Details
                     </button>
                     <button
                       onClick={() => handleDeleteCategory(category._id)}
-                      className="bg-red-500 text-white px-4 py-2.5 rounded-lg hover:bg-red-600 transition"
+                      className="bg-red-500 text-white px-4 py-2.5 rounded-lg hover:bg-red-600 transition cursor-pointer"
                       title="Delete Category"
                     >
                       <Trash2 size={18} />

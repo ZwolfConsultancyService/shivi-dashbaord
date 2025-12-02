@@ -78,7 +78,7 @@ export default function PlaceDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-8">
+    <div className="min-h-screen py-8">
       <div className="max-w-5xl mx-auto px-4">
         <button
           onClick={() => navigate(-1)}
@@ -125,13 +125,13 @@ export default function PlaceDetail() {
             <div className="flex gap-4 pt-6 border-t">
               <button
                 onClick={() => navigate(-1)}
-                className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition cursor-pointer"
               >
                 Go Back
               </button>
               <button
                 onClick={handleDeletePlace}
-                className="flex-1 bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition flex items-center justify-center gap-2"
+                className="flex-1 bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Trash2 size={20} />
                 Delete Place
