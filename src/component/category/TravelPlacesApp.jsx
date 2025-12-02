@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Eye, Trash2 } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://shivi-backend.onrender.com/api';
 
 export default function TravelPlacesApp() {
   const [categories, setCategories] = useState([]);

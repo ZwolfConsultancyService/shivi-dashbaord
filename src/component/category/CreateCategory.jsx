@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, MapPin } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://shivi-backend.onrender.com/api';
 
 export default function CreateCategory() {
   const navigate = useNavigate();

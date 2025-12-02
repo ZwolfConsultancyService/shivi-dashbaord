@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, ArrowLeft, Trash2, Plus } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://shivi-backend.onrender.com/api';
 
 export default function CategoryDetail() {
   const { id } = useParams();

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Eye, Trash2, Plus } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = 'https://shivi-backend.onrender.com/api';
 
 export default function CategoryList() {
   const [categories, setCategories] = useState([]);
