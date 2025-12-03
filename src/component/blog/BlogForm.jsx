@@ -3,48 +3,25 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-import {
-  useCreateBlogMutation,
-  useUpdateBlogMutation,
-  useGetBlogQuery,
-  useUploadImageMutation,
-  useGetCategoriesQuery,
-} from "../../store/api/blogApi";
-import { Upload, X, Save, ArrowLeft, Image as ImageIcon, Calendar } from "lucide-react";
+import { Upload, X, Save, ArrowLeft, Image as ImageIcon, Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
+import axios from "axios";
+
+const API_BASE_URL = "https://shivi-backend.onrender.com/api";
 
 const BlogForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
   
-  // Add debugging
-  console.log("URL params:", useParams());
-  console.log("ID from params:", id);
-  console.log("Is editing:", isEditing);
-  
-  const imageInputRef = useRef(null);
-
-  const [images, setImages] = useState([]);
+  const fileInputRef = useRef(null);
+  const [uploadedImages, setUploadedImages] = useState([]);
   const [tagInput, setTagInput] = useState("");
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-
-  const { data: blogData, isLoading: isBlogLoading, error: blogError } = useGetBlogQuery(id, {
-    skip: !isEditing,
-    refetchOnMountOrArgChange: true,
-  });
-  
-  // Add debugging for blog data
-  console.log("Blog data:", blogData);
-  console.log("Blog loading:", isBlogLoading);
-  console.log("Blog error:", blogError);
-  
-  const { data: authorsData } = useGetAuthorsQuery();
-  const { data: categoriesData } = useGetCategoriesQuery();
-
-  const [createBlog, { isLoading: isCreating }] = useCreateBlogMutation();
-  const [updateBlog, { isLoading: isUpdating }] = useUpdateBlogMutation();
-  const [uploadImage] = useUploadImageMutation();
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+const [categories, setCategories] = useState([]);
+const [selectedCategory, setSelectedCategory] = useState(null);
 
   const {
     register,
@@ -57,84 +34,121 @@ const BlogForm = () => {
     defaultValues: {
       title: "",
       content: "",
-      category: "",
-      tags: [],
-      images: [],
       author: "",
-      publishedAt: "",
+      tags: [],
       isPublished: true,
     },
   });
 
   const watchedTags = watch("tags");
   const watchedIsPublished = watch("isPublished");
-  const watchedPublishedAt = watch("publishedAt");
+
+  // Fetch blog data if editing
+  useEffect(() => {
+    const fetchBlog = async () => {
+      if (!isEditing) return;
+
+      setIsLoading(true);
+      try {
+    const response = await axios.get(`${API_BASE_URL}/blog/${id}`);
+        const blog = response.data.data;
+
+        setValue("title", blog.title);
+        setValue("content", blog.content);
+        setValue("author", blog.author);
+        setValue("tags", blog.tags || []);
+        setValue("isPublished", blog.isPublished);
+        setUploadedImages(blog.images || []);
+      } catch (error) {
+        console.error("Error fetching blog:", error);
+        toast.error("Failed to load blog data");
+        navigate("/");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBlog();
+  }, [id, isEditing, setValue, navigate]);
+
 
   useEffect(() => {
-    if (isEditing && blogData?.data) {
-      const blog = blogData.data;
-      console.log("Setting form values with blog data:", blog);
-      setValue("title", blog.title || "");
-      setValue("content", blog.content || "");
-      setValue("category", blog.category?._id || blog.category || "");
-      setValue("tags", blog.tags || []);
-      setValue("author", blog.author || "");
-      setValue("publishedAt", blog.publishedAt ? new Date(blog.publishedAt).toISOString().slice(0, 16) : "");
-      setValue("isPublished", blog.isPublished !== undefined ? blog.isPublished : true);
-      setImages(blog.images || []);
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/categories/getAllCategories`);
+      setCategories(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
     }
-  }, [blogData, setValue, isEditing]);
+  };
+  fetchCategories();
+}, []); 
 
   const handleImageUploadClick = () => {
-    if (imageInputRef.current) {
-      imageInputRef.current.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
   };
 
   const handleImageUpload = async (event) => {
     const files = Array.from(event.target.files);
-    if (!files.length) return;
+    if (files.length === 0) return;
 
-    setIsUploadingImage(true);
+    // Validate file size (5MB max per file)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      toast.error("Some files exceed 5MB limit");
+      return;
+    }
+
+    setIsUploading(true);
 
     try {
       const uploadPromises = files.map(async (file) => {
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
-        }
-
-        if (!file.type.startsWith('image/')) {
-          throw new Error(`File ${file.name} is not a valid image.`);
-        }
-
         const formData = new FormData();
         formData.append("image", file);
 
-        const response = await uploadImage(formData).unwrap();
-        return {
-          url: response.data.url,
-          fileId: response.data.fileId || response.data.id,
-          name: response.data.name || file.name
-        };
+        const response = await axios.post(`${API_BASE_URL}/blog/upload`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        return response.data.data;
       });
 
-      const uploadedImages = await Promise.all(uploadPromises);
-      setImages(prev => [...prev, ...uploadedImages]);
-      toast.success(`${uploadedImages.length} image(s) uploaded successfully`);
+      const uploadedImageData = await Promise.all(uploadPromises);
+      setUploadedImages((prev) => [...prev, ...uploadedImageData]);
+      toast.success(`${uploadedImageData.length} image(s) uploaded successfully`);
     } catch (error) {
-      const errorMessage = error.data?.message || error.message || "Failed to upload images";
+      const errorMessage = error.response?.data?.message || error.message || "Failed to upload images";
       toast.error(errorMessage);
       console.error("Upload error:", error);
     } finally {
-      setIsUploadingImage(false);
-      if (imageInputRef.current) {
-        imageInputRef.current.value = '';
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     }
   };
 
-  const removeImage = (indexToRemove) => {
-    setImages(prev => prev.filter((_, index) => index !== indexToRemove));
+  const removeImage = async (index) => {
+    const imageToRemove = uploadedImages[index];
+    
+    // If image has fileId, it's already uploaded to ImageKit
+    if (imageToRemove.fileId) {
+      try {
+        // Note: You might want to call a delete endpoint here
+        // For now, we'll just remove it from the state
+        console.log("Image will be deleted when blog is saved:", imageToRemove.fileId);
+      } catch (error) {
+        console.error("Error marking image for deletion:", error);
+      }
+    }
+    
+    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleAddTag = (e) => {
@@ -142,6 +156,12 @@ const BlogForm = () => {
       e.preventDefault();
       const newTag = tagInput.trim().toLowerCase();
       const currentTags = watchedTags || [];
+
+      // Validate tag length
+      if (newTag.length > 50) {
+        toast.error("Tag cannot exceed 50 characters");
+        return;
+      }
 
       if (!currentTags.includes(newTag)) {
         setValue("tags", [...currentTags, newTag]);
@@ -159,31 +179,41 @@ const BlogForm = () => {
   };
 
   const onSubmit = async (data) => {
+    setIsSubmitting(true);
+
     try {
       const blogData = {
         ...data,
-        images: images,
-        publishedAt: data.publishedAt ? new Date(data.publishedAt).toISOString() : new Date().toISOString(),
+        images: uploadedImages,
       };
 
-      console.log("Submitting blog data:", blogData);
-
+      let response;
       if (isEditing) {
-        console.log("Updating blog with ID:", id);
-        await updateBlog({ id, ...blogData }).unwrap();
+        response = await axios.put(`${API_BASE_URL}/blog/${id}`, blogData);
         toast.success("Blog updated successfully");
       } else {
-        console.log("Creating new blog");
-        await createBlog(blogData).unwrap();
+       response = await axios.post(`${API_BASE_URL}/blog/create`, blogData);
         toast.success("Blog created successfully");
       }
 
       navigate("/");
     } catch (error) {
-      toast.error(
-        isEditing ? "Failed to update blog" : "Failed to create blog"
-      );
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          (isEditing ? "Failed to update blog" : "Failed to create blog");
+      
+      // Handle validation errors
+      if (error.response?.data?.errors) {
+        error.response.data.errors.forEach(err => {
+          toast.error(err.msg || err.message);
+        });
+      } else {
+        toast.error(errorMessage);
+      }
+      
       console.error("Submit error:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -203,83 +233,38 @@ const BlogForm = () => {
   };
 
   const quillFormats = [
-    'header', 'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet', 'script', 'indent', 'blockquote',
-    'code-block', 'color', 'background', 'align', 'link'
+    "header", "bold", "italic", "underline", "strike",
+    "list", "bullet", "script", "indent", "blockquote",
+    "code-block", "color", "background", "align", "link"
   ];
 
-  // Show debugging info in the UI during development
-  if (process.env.NODE_ENV === 'development') {
-    console.log("=== BlogForm Debug Info ===");
-    console.log("ID:", id);
-    console.log("IsEditing:", isEditing);
-    console.log("BlogData:", blogData);
-    console.log("isBlogLoading:", isBlogLoading);
-    console.log("blogError:", blogError);
-  }
-
-  if (isEditing && isBlogLoading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        <div className="ml-4">
-          <p>Loading blog data...</p>
-          {process.env.NODE_ENV === 'development' && (
-            <p className="text-sm text-gray-500">ID: {id}</p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (isEditing && blogError) {
-    return (
-      <div className="text-center py-12">
-        <div className="text-red-600 text-lg">Error loading blog</div>
-        <p className="text-gray-600 mt-2">
-          {blogError.data?.message || blogError.message || "Please try again later"}
-        </p>
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 text-sm text-gray-500">
-            <p>ID: {id}</p>
-            <p>Error: {JSON.stringify(blogError, null, 2)}</p>
-          </div>
-        )}
-        <button
-          onClick={() => navigate("/")}
-          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Back to Posts
-        </button>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-4">
       <div className="mb-6">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Back to Posts</span>
         </button>
 
         <h1 className="text-3xl font-bold text-gray-900">
-          {isEditing ? `Edit Blog Post ${id ? `(ID: ${id})` : ''}` : "Create New Blog Post"}
+          {isEditing ? "Edit Blog Post" : "Create New Blog Post"}
         </h1>
-        
-        {/* Development debug info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-2 p-2 bg-gray-100 rounded text-sm">
-            <p><strong>Debug:</strong> ID={id}, isEditing={String(isEditing)}, hasData={Boolean(blogData?.data)}</p>
-          </div>
-        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+          {/* Title Field */}
           <div className="mb-6">
             <label
               htmlFor="title"
@@ -297,7 +282,7 @@ const BlogForm = () => {
                   message: "Title cannot exceed 200 characters",
                 },
               })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               placeholder="Enter blog title..."
             />
             {errors.title && (
@@ -307,34 +292,7 @@ const BlogForm = () => {
             )}
           </div>
 
-          <div className="mb-6">
-            <label
-              htmlFor="category"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
-              Category *
-            </label>
-            <select
-              id="category"
-              {...register("category", {
-                required: "Category is required",
-              })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <option value="">Select a category...</option>
-              {categoriesData?.data?.map((category) => (
-                <option key={category._id || category.id} value={category._id || category.id}>
-                  {category.name || category}
-                </option>
-              ))}
-            </select>
-            {errors.category && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.category.message}
-              </p>
-            )}
-          </div>
-
+          {/* Author Field */}
           <div className="mb-6">
             <label
               htmlFor="author"
@@ -342,7 +300,8 @@ const BlogForm = () => {
             >
               Author *
             </label>
-            <select
+            <input
+              type="text"
               id="author"
               {...register("author", {
                 required: "Author is required",
@@ -351,15 +310,9 @@ const BlogForm = () => {
                   message: "Author name cannot exceed 100 characters",
                 },
               })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <option value="">Select author...</option>
-              {authorsData?.data?.map((author) => (
-                <option key={author} value={author}>
-                  {author}
-                </option>
-              ))}
-            </select>
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              placeholder="Enter author name..."
+            />
             {errors.author && (
               <p className="mt-1 text-sm text-red-600">
                 {errors.author.message}
@@ -367,6 +320,31 @@ const BlogForm = () => {
             )}
           </div>
 
+          {/* Published Status */}
+          <div className="mb-6">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                {...register("isPublished")}
+                className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Publish immediately
+              </span>
+              {watchedIsPublished ? (
+                <Eye className="h-4 w-4 text-green-600" />
+              ) : (
+                <EyeOff className="h-4 w-4 text-gray-400" />
+              )}
+            </label>
+            <p className="mt-1 text-xs text-gray-500">
+              {watchedIsPublished 
+                ? "This blog will be visible to everyone" 
+                : "This blog will be saved as draft"}
+            </p>
+          </div>
+
+          {/* Tags Field */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Tags
@@ -376,24 +354,21 @@ const BlogForm = () => {
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleAddTag}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               placeholder="Type a tag and press Enter..."
             />
-            <p className="mt-1 text-xs text-gray-500">
-              Tags will be automatically converted to lowercase
-            </p>
             {watchedTags && watchedTags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {watchedTags.map((tag, index) => (
                   <span
                     key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-800"
+                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800"
                   >
                     {tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
-                      className="ml-2 text-indigo-600 hover:text-indigo-800"
+                      className="ml-2 text-red-600 hover:text-red-800"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -403,105 +378,84 @@ const BlogForm = () => {
             )}
           </div>
 
+          {/* Images Upload */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Images
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-gray-400 transition-colors">
-              {images.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                  {images.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <p className="text-xs text-gray-500 mt-1 truncate">
-                        {image.name}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-gray-400 transition-colors">
               <div className="text-center">
-                <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
-                <div className="mt-2">
+                <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="mt-4">
                   <button
                     type="button"
                     onClick={handleImageUploadClick}
-                    disabled={isUploadingImage}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={isUploading}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <Upload className="h-3 w-3 mr-1" />
-                    {isUploadingImage ? "Uploading..." : "Upload Images"}
+                    <Upload className="h-4 w-4 mr-2" />
+                    {isUploading ? "Uploading..." : "Upload Images"}
                   </button>
                   <input
-                    ref={imageInputRef}
+                    ref={fileInputRef}
                     type="file"
-                    accept="image/*"
                     multiple
+                    accept="image/*"
                     onChange={handleImageUpload}
-                    disabled={isUploadingImage}
+                    disabled={isUploading}
                     className="hidden"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    PNG, JPG up to 5MB each. Multiple files supported.
+                  <p className="mt-2 text-sm text-gray-500">
+                    PNG, JPG, GIF up to 5MB each
                   </p>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label
-                htmlFor="publishedAt"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                <Calendar className="inline h-4 w-4 mr-1" />
-                Publish Date
-              </label>
-              <input
-                type="datetime-local"
-                id="publishedAt"
-                {...register("publishedAt")}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Leave empty for current date/time
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Publication Status
-              </label>
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="isPublished"
-                  {...register("isPublished")}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-                <label htmlFor="isPublished" className="ml-2 text-sm text-gray-700">
-                  Published
-                </label>
+            {uploadedImages.length > 0 && (
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {uploadedImages.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={image.url}
+                      alt={image.name}
+                      className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Uncheck to save as draft
-              </p>
-            </div>
+            )}
           </div>
 
+          <div className="mb-6">
+  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+    Category *
+  </label>
+  <select
+    id="category"
+    {...register("category", { required: "Category is required" })}
+    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+  >
+    <option value="">Select a category</option>
+    {categories.map((cat) => (
+      <option key={cat._id} value={cat._id}>
+        {cat.name}
+      </option>
+    ))}
+  </select>
+  {errors.category && (
+    <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
+  )}
+</div>
+
+          {/* Content Field */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Content *
@@ -535,49 +489,24 @@ const BlogForm = () => {
               </p>
             )}
           </div>
-
-          {watchedIsPublished && watchedPublishedAt && (
-            <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center">
-                <Calendar className="h-5 w-5 text-green-600 mr-2" />
-                <span className="text-sm font-medium text-green-800">
-                  Will be published on: {new Date(watchedPublishedAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {!watchedIsPublished && (
-            <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <div className="flex items-center">
-                <span className="text-sm font-medium text-yellow-800">
-                  📝 This post will be saved as a draft
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
+        {/* Action Buttons */}
         <div className="flex justify-end space-x-4">
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+            disabled={isSubmitting}
+            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
-            disabled={isCreating || isUpdating}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+            disabled={isSubmitting || isUploading}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
           >
-            {isCreating || isUpdating ? (
+            {isSubmitting ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 <span>{isEditing ? "Updating..." : "Creating..."}</span>

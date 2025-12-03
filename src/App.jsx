@@ -31,7 +31,7 @@ function App() {
 
               <Route path="/forms" element={<Form />} />
               <Route path="/" element={<BlogList />} />
-              <Route path="/create" element={<Form />} />
+              <Route path="/create" element={<BlogForm />} />
               <Route path="/edit/:id" element={<BlogForm />} />
               <Route path="/blog/:id" element={<BlogDetail />} />
 

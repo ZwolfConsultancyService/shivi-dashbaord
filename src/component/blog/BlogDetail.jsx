@@ -1,46 +1,65 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useGetBlogQuery, useDeleteBlogMutation } from '../../store/api/blogApi';
+import { ArrowLeft, Edit, Trash2, Calendar, User, Tag, Eye } from 'lucide-react';
+import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import axios from 'axios';
+
+const API_BASE_URL =  "https://shivi-backend.onrender.com/api";
 
 const BlogDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  const { data: response, isLoading, error } = useGetBlogQuery({ id });
+  const [blog, setBlog] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState(null);
 
-  const [deleteBlog, { isLoading: isDeleting }] = useDeleteBlogMutation();
+  useEffect(() => {
+    const fetchBlog = async () => {
+      setIsLoading(true);
+      setError(null);
 
-  // Extract blog from response (in case your API returns { success: true, data: blog })
-  const blog = response?.data || response;
+      try {
+       const response = await axios.get(`${API_BASE_URL}/blog/${id}`);
+        setBlog(response.data.data);
+        
+        // Optionally increment view count
+        // You could add this endpoint to your backend
+        // await axios.post(`${API_BASE_URL}/blogs/${id}/view`);
+      } catch (error) {
+        console.error('Error fetching blog:', error);
+        setError(error.response?.data?.message || 'Failed to load blog');
+        toast.error('Failed to load blog post');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBlog();
+  }, [id]);
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this blog post?')) {
+      setIsDeleting(true);
       try {
-        await deleteBlog(id).unwrap();
+        await axios.delete(`${API_BASE_URL}/blog/${id}`);
         toast.success('Blog post deleted successfully');
         navigate('/');
       } catch (error) {
-        toast.error('Failed to delete blog post');
+        console.error('Error deleting blog:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete blog post');
+        setIsDeleting(false);
       }
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading blog post...</p>
         </div>
       </div>
@@ -55,12 +74,13 @@ const BlogDetail = () => {
             {error ? 'Error Loading Blog' : 'Blog Not Found'}
           </h2>
           <p className="text-gray-500 mb-4">
-            {error ? 'Something went wrong while loading the blog post.' : 'The requested blog post could not be found.'}
+            {error || 'The requested blog post could not be found.'}
           </p>
           <Link 
             to="/" 
-            className="text-blue-600 hover:text-blue-800 underline"
+            className="inline-flex items-center text-red-600 hover:text-red-800"
           >
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Blog List
           </Link>
         </div>
@@ -68,54 +88,120 @@ const BlogDetail = () => {
     );
   }
 
-  // Debug: Log the blog object to see its structure
-  // console.log('Blog object:', blog);
-
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header with navigation and actions */}
+    <div className="max-w-4xl mx-auto p-4">
       <div className="mb-6">
         <Link 
           to="/" 
-          className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
+          className="inline-flex items-center text-red-600 hover:text-red-800 mb-4"
         >
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Blog List
         </Link>
         
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{blog.title || 'Untitled'}</h1>
-            <p className="text-gray-600 text-sm">
-              {blog.createdAt && `Published on ${formatDate(blog.createdAt)}`}
-              {blog.updatedAt && blog.updatedAt !== blog.createdAt && (
-                <span> • Updated on {formatDate(blog.updatedAt)}</span>
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+          <div className="flex-1">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+              {blog.title || 'Untitled'}
+            </h1>
+            
+            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+              <div className="flex items-center">
+                <User className="h-4 w-4 mr-1" />
+                <span>{blog.author}</span>
+              </div>
+              
+              <div className="flex items-center">
+                <Calendar className="h-4 w-4 mr-1" />
+                <span>{format(new Date(blog.createdAt), 'MMMM dd, yyyy')}</span>
+              </div>
+              
+              {blog.views !== undefined && (
+                <div className="flex items-center">
+                  <Eye className="h-4 w-4 mr-1" />
+                  <span>{blog.views} views</span>
+                </div>
               )}
-            </p>
+              
+              {!blog.isPublished && (
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-medium">
+                  Draft
+                </span>
+              )}
+            </div>
+            
+            {blog.updatedAt && blog.updatedAt !== blog.createdAt && (
+              <p className="text-sm text-gray-500 mt-1">
+                Last updated: {format(new Date(blog.updatedAt), 'MMMM dd, yyyy')}
+              </p>
+            )}
           </div>
           
-          <div className="flex space-x-2 ml-4">
+          <div className="flex gap-2">
             <Link
-              to={`/edit/${blog.id || blog._id}`}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              to={`/edit/${blog._id}`}
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
+              <Edit className="h-4 w-4 mr-2" />
               Edit
             </Link>
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <Trash2 className="h-4 w-4 mr-2" />
               {isDeleting ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Blog content - FIXED: Now renders HTML properly */}
-      <article className="bg-white rounded-lg shadow-md p-8">
+      {/* Featured Image */}
+      {blog.images && blog.images.length > 0 && (
+        <div className="mb-6 rounded-lg overflow-hidden shadow-md">
+          <img
+            src={blog.images[0].url}
+            alt={blog.title}
+            className="w-full h-auto object-cover max-h-[500px]"
+          />
+        </div>
+      )}
+
+      {/* Multiple Images Gallery */}
+      {blog.images && blog.images.length > 1 && (
+        <div className="mb-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+          {blog.images.slice(1).map((image, index) => (
+            <div key={index} className="rounded-lg overflow-hidden shadow-sm">
+              <img
+                src={image.url}
+                alt={`${blog.title} - ${index + 2}`}
+                className="w-full h-48 object-cover hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tags */}
+      {blog.tags && blog.tags.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Tag className="h-4 w-4 text-gray-500" />
+            {blog.tags.map((tag, index) => (
+              <span
+                key={index}
+                className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content */}
+      <article className="bg-white rounded-lg shadow-md p-8 mb-6">
         <div className="prose prose-lg max-w-none">
           {blog.content ? (
             <div 
@@ -128,45 +214,22 @@ const BlogDetail = () => {
         </div>
       </article>
 
-      {/* Author section */}
-      {blog.author && (
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Author:</h3>
-          <p className="text-gray-700">{blog.author}</p>
-        </div>
-      )}
-
-      {/* Tags section */}
-      {blog.tags && blog.tags.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Tags:</h3>
-          <div className="flex flex-wrap gap-2">
-            {blog.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Related actions */}
+      {/* Footer Actions */}
       <div className="mt-8 pt-6 border-t border-gray-200">
         <div className="flex justify-between items-center">
           <Link
             to="/create"
-            className="text-green-600 hover:text-green-800 font-medium"
+            className="text-green-600 hover:text-green-800 font-medium flex items-center"
           >
+            <Edit className="h-4 w-4 mr-1" />
             Write a new blog post
           </Link>
           <Link
             to="/"
-            className="text-blue-600 hover:text-blue-800 font-medium"
+            className="text-red-600 hover:text-red-800 font-medium flex items-center"
           >
             View all posts
+            <ArrowLeft className="h-4 w-4 ml-1 rotate-180" />
           </Link>
         </div>
       </div>

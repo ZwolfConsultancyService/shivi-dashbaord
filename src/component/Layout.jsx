@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PenTool, BookOpen, Plus, Home, FileText, BadgePoundSterlingIcon } from 'lucide-react';
+import { ImBlog } from "react-icons/im";
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -29,8 +30,8 @@ const Layout = ({ children }) => {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Home</span>
+                <ImBlog className="h-4 w-4" />
+                <span className="hidden sm:inline">Blog</span>
               </Link>
               
               <Link

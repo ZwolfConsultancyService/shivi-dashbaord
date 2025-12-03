@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://zwolf-blogwebsite-backend.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://shivi-backend.onrender.com/api';
 
 export const blogApi = createApi({
   reducerPath: 'blogApi',
@@ -13,238 +13,108 @@ export const blogApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Blog', 'Category', 'Tags', 'Authors', 'Stats'],
+  tagTypes: ['Blog', 'Category'],
   endpoints: (builder) => ({
-    // BLOG ENDPOINTS
+    // ============ BLOG ENDPOINTS ============
     
-    // Get all blogs with pagination, search, and filters
+    // Get all blogs with search, category, and tags filters
     getBlogs: builder.query({
       query: ({ 
-        page = 1, 
-        limit = 10, 
         search = '', 
-        author = '', 
-        tags = '', 
-        includeUnpublished = false,
-        published = '',
-        dateFrom = '',
-        dateTo = '',
-        sortBy = 'publishedAt'
+        category = '', 
+        tags = ''
       } = {}) => {
         const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
         if (search) params.append('search', search);
-        if (author) params.append('author', author);
+        if (category) params.append('category', category);
         if (tags) params.append('tags', tags);
-        if (includeUnpublished) params.append('includeUnpublished', 'true');
-        if (published !== '') params.append('published', published);
-        if (dateFrom) params.append('dateFrom', dateFrom);
-        if (dateTo) params.append('dateTo', dateTo);
-        if (sortBy) params.append('sortBy', sortBy);
                 
-        return `/blogs/fetch?${params.toString()}`;
+        return `/blog/getAllblog?${params.toString()}`;
       },
       providesTags: ['Blog'],
     }),
 
     // Get only published blogs
     getPublishedBlogs: builder.query({
-      query: ({ page = 1, limit = 10 } = {}) => {
-        const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
-        
-        return `/blogs/published?${params.toString()}`;
-      },
-      providesTags: ['Blog'],
-    }),
-
-    // Get blogs by category
-    getBlogsByCategory: builder.query({
-      query: ({ 
-        categoryId, 
-        page = 1, 
-        limit = 10, 
-        search = '', 
-        author = '', 
-        tags = '', 
-        includeUnpublished = false,
-        dateFrom = '',
-        dateTo = '',
-        sortBy = 'publishedAt'
-      }) => {
-        const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
-        if (search) params.append('search', search);
-        if (author) params.append('author', author);
-        if (tags) params.append('tags', tags);
-        if (includeUnpublished) params.append('includeUnpublished', 'true');
-        if (dateFrom) params.append('dateFrom', dateFrom);
-        if (dateTo) params.append('dateTo', dateTo);
-        if (sortBy) params.append('sortBy', sortBy);
-                
-        return `/blogs/category/${categoryId}?${params.toString()}`;
-      },
+      query: () => '/blog/published',
       providesTags: ['Blog'],
     }),
 
     // Get single blog by ID
     getBlog: builder.query({
-      query: ({ id, includeUnpublished = false }) => {
-        const params = includeUnpublished ? '?includeUnpublished=true' : '';
-        return `/blogs/${id}${params}`;
-      },
-      providesTags: (result, error, { id }) => [{ type: 'Blog', id }],
+      query: (id) => `/blog/${id}`,
+      providesTags: (result, error, id) => [{ type: 'Blog', id }],
     }),
 
     // Create blog post
     createBlog: builder.mutation({
       query: (blogData) => ({
-        url: '/blogs/create',
+        url: '/blog/create',
         method: 'POST',
         body: blogData,
       }),
-      invalidatesTags: ['Blog', 'Stats'],
+      invalidatesTags: ['Blog'],
     }),
 
     // Update blog post
     updateBlog: builder.mutation({
       query: ({ id, ...blogData }) => ({
-        url: `/blogs/${id}`,
+        url: `/blog/${id}`,
         method: 'PUT',
         body: blogData,
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Blog', id }, 'Blog', 'Stats'],
-    }),
-
-    // Toggle publish status
-    togglePublishStatus: builder.mutation({
-      query: ({ id, isPublished }) => ({
-        url: `/blogs/${id}/toggle-publish`,
-        method: 'PATCH',
-        body: { isPublished },
-      }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'Blog', id }, 'Blog', 'Stats'],
+      invalidatesTags: (result, error, { id }) => [{ type: 'Blog', id }, 'Blog'],
     }),
 
     // Delete blog post
     deleteBlog: builder.mutation({
       query: (id) => ({
-        url: `/blogs/${id}`,
+        url: `/blog/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Blog', 'Stats'],
+      invalidatesTags: ['Blog'],
     }),
 
-    // Upload image for blog post
+    // Upload image (ImageKit)
     uploadImage: builder.mutation({
       query: (formData) => ({
-        url: '/blogs/upload-image',
+        url: '/blog/upload-image',
         method: 'POST',
         body: formData,
       }),
     }),
 
-    // Get blog statistics
-    getBlogStats: builder.query({
-      query: () => '/blogs/stats',
-      providesTags: ['Stats'],
-    }),
-
-    // Get all unique tags from blog posts
-    getTags: builder.query({
-      query: ({ includeUnpublished = false } = {}) => {
-        const params = includeUnpublished ? '?includeUnpublished=true' : '';
-        return `/blogs/tags${params}`;
-      },
-      providesTags: ['Tags'],
-    }),
-
-    // Get all unique authors from blog posts  
-    getAuthors: builder.query({
-      query: ({ includeUnpublished = false } = {}) => {
-        const params = includeUnpublished ? '?includeUnpublished=true' : '';
-        return `/blogs/authors${params}`;
-      },
-      providesTags: ['Authors'],
-    }),
-
-    // CATEGORY ENDPOINTS
-
-    // Get all categories with pagination
+    // ============ CATEGORY ENDPOINTS ============
+    
+    // Get all categories
     getCategories: builder.query({
-      query: ({ 
-        page = 1, 
-        limit = 10, 
-        search = '', 
-        sortBy = 'createdAt' 
-      } = {}) => {
-        const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
-        if (search) params.append('search', search);
-        if (sortBy) params.append('sortBy', sortBy);
-        
-        return `/categories/fetch?${params.toString()}`;
-      },
+      query: () => '/categories',
       providesTags: ['Category'],
+      transformResponse: (response) => {
+        // Transform to match expected format
+        return {
+          success: true,
+          data: response.data || response
+        };
+      },
     }),
 
-    // Get simple category list (for dropdowns)
+    // Simple categories list (for dropdowns)
     getCategoriesSimple: builder.query({
-      query: () => '/categories/list',
+      query: () => '/categories',
       providesTags: ['Category'],
-    }),
-
-    // Get categories with their blogs
-    getCategoriesWithBlogs: builder.query({
-      query: ({ 
-        page = 1, 
-        limit = 10, 
-        blogLimit = 5, 
-        includeUnpublished = false 
-      } = {}) => {
-        const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
-        if (blogLimit) params.append('blogLimit', blogLimit.toString());
-        if (includeUnpublished) params.append('includeUnpublished', 'true');
-        
-        return `/categories/with-blogs?${params.toString()}`;
+      transformResponse: (response) => {
+        return {
+          success: true,
+          data: response.data || response
+        };
       },
-      providesTags: ['Category', 'Blog'],
     }),
 
     // Get single category by ID
     getCategory: builder.query({
       query: (id) => `/categories/${id}`,
       providesTags: (result, error, id) => [{ type: 'Category', id }],
-    }),
-
-    // Get category with its blogs
-    getCategoryWithBlogs: builder.query({
-      query: ({ 
-        id, 
-        page = 1, 
-        limit = 10, 
-        includeUnpublished = false 
-      }) => {
-        const params = new URLSearchParams();
-        if (page) params.append('page', page.toString());
-        if (limit) params.append('limit', limit.toString());
-        if (includeUnpublished) params.append('includeUnpublished', 'true');
-        
-        return `/categories/${id}/with-blogs?${params.toString()}`;
-      },
-      providesTags: (result, error, { id }) => [{ type: 'Category', id }, 'Blog'],
-    }),
-
-    // Get category by name
-    getCategoryByName: builder.query({
-      query: (name) => `/categories/name/${name}`,
-      providesTags: (result, error, name) => [{ type: 'Category', id: name }],
     }),
 
     // Create category
@@ -276,10 +146,37 @@ export const blogApi = createApi({
       invalidatesTags: ['Category'],
     }),
 
-    // Get category statistics
-    getCategoryStats: builder.query({
-      query: () => '/categories/stats',
-      providesTags: ['Category', 'Stats'],
+    // ============ HELPER ENDPOINTS ============
+    // These extract data from blogs for filters
+    
+    // Get unique tags from all blogs
+    getTags: builder.query({
+      query: () => '/blog/getAllblog',
+      transformResponse: (response) => {
+        const blogs = response.data || [];
+        const allTags = blogs.flatMap(blog => blog.tags || []);
+        const uniqueTags = [...new Set(allTags)];
+        return {
+          success: true,
+          data: uniqueTags
+        };
+      },
+      providesTags: ['Blog'],
+    }),
+
+    // Get unique authors from all blogs
+    getAuthors: builder.query({
+      query: () => '/blog/getAllblog',
+      transformResponse: (response) => {
+        const blogs = response.data || [];
+        const allAuthors = blogs.map(blog => blog.author).filter(Boolean);
+        const uniqueAuthors = [...new Set(allAuthors)];
+        return {
+          success: true,
+          data: uniqueAuthors
+        };
+      },
+      providesTags: ['Blog'],
     }),
   }),
 });
@@ -288,26 +185,21 @@ export const {
   // Blog hooks
   useGetBlogsQuery,
   useGetPublishedBlogsQuery,
-  useGetBlogsByCategory,
   useGetBlogQuery,
   useCreateBlogMutation,
   useUpdateBlogMutation,
-  useTogglePublishStatusMutation,
   useDeleteBlogMutation,
   useUploadImageMutation,
-  useGetBlogStatsQuery,
-  useGetTagsQuery,
-  useGetAuthorsQuery,
   
   // Category hooks
   useGetCategoriesQuery,
   useGetCategoriesSimpleQuery,
-  useGetCategoriesWithBlogsQuery,
   useGetCategoryQuery,
-  useGetCategoryWithBlogsQuery,
-  useGetCategoryByNameQuery,
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
-  useGetCategoryStatsQuery,
+
+  // Helper hooks
+  useGetTagsQuery,
+  useGetAuthorsQuery,
 } = blogApi;
